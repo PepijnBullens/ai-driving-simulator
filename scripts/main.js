@@ -1,3 +1,13 @@
+const N = 300;
+const MUTATION_DIFFERENCE = 0.1;
+const CAR_PASSING_MAX = 4000;
+const GAP_DIFFERENCE = 20;
+
+//
+//
+//
+//
+
 const carCanvas = document.querySelector("#carCanvas");
 carCanvas.width = 200;
 const networkCanvas = document.querySelector("#networkCanvas");
@@ -7,11 +17,6 @@ const carCtx = carCanvas.getContext("2d");
 const networkCtx = networkCanvas.getContext("2d");
 
 const road = new Road(carCanvas.width / 2, carCanvas.width * 0.9);
-
-const N = 300;
-const MDIFFERENCE = 0.2;
-const MDELAY = 60;
-const GAPDIFFERENCE = 10;
 
 let genCount = 0;
 const genCountElement = document.querySelector("#genCount");
@@ -31,43 +36,39 @@ if (localStorage.getItem("bestBrain")) {
   for (let i = 0; i < cars.length; i++) {
     cars[i].brain = JSON.parse(localStorage.getItem("bestBrain"));
     if (i != 0) {
-      NeuralNetwork.mutate(cars[i].brain, MDIFFERENCE);
+      NeuralNetwork.mutate(cars[i].brain, MUTATION_DIFFERENCE);
     }
   }
 }
 
-const traffic = [
-  new Car(road.getLaneCenter(0), -300, 30, 50, "DUMMY", 2),
-  new Car(road.getLaneCenter(1), -100, 30, 50, "DUMMY", 2),
-  new Car(road.getLaneCenter(2), -300, 30, 50, "DUMMY", 2),
+const TRAFFIC_HEIGHT = 5000;
 
-  new Car(road.getLaneCenter(1), -500, 30, 50, "DUMMY", 2),
-  new Car(road.getLaneCenter(0), -500, 30, 50, "DUMMY", 2),
+const traffic = generateTraffic(TRAFFIC_HEIGHT);
 
-  new Car(road.getLaneCenter(2), -700, 30, 50, "DUMMY", 2),
-  new Car(road.getLaneCenter(0), -800, 30, 50, "DUMMY", 2),
+function generateTraffic(height) {
+  const traffic = [];
+  const lanes = [0, 1, 2];
+  let currentY = 0;
 
-  new Car(road.getLaneCenter(0), -1200, 30, 50, "DUMMY", 2),
-  new Car(road.getLaneCenter(1), -1000, 30, 50, "DUMMY", 2),
-  new Car(road.getLaneCenter(2), -1200, 30, 50, "DUMMY", 2),
-];
+  while (currentY > -height) {
+    const lane = lanes[Math.floor(Math.random() * lanes.length)];
+    traffic.push(
+      new Car(road.getLaneCenter(lane), currentY, 30, 50, "DUMMY", 2)
+    );
+    currentY -= Math.random() * 200 + 100; // Random spacing between 100 and 300
+  }
 
-animate();
-
-setTimeout(() => {
-  save();
-}, MDELAY * 1000);
+  return traffic;
+}
 
 function save() {
   localStorage.setItem("bestBrain", JSON.stringify(bestCar.brain));
   localStorage.setItem("oldBestY", bestCar.y);
+}
+
+function newGen() {
   localStorage.setItem("genCount", parseInt(genCount) + 1);
-  if (!window.reloadFlag) {
-    window.reloadFlag = true;
-    setTimeout(() => {
-      window.location.reload();
-    }, 1000);
-  }
+  window.location.reload();
 }
 
 function discard() {
@@ -85,19 +86,21 @@ function generateCars(N) {
   return cars;
 }
 
+let nextTrafficIndex = 0;
+const orderedTraffic = [...traffic].sort((a, b) => a.y - b.y).reverse();
+
+let carPassingTimeout = setTimeout(() => {
+  newGen();
+}, CAR_PASSING_MAX);
+
+animate();
+
 function animate(time) {
   for (let i = 0; i < traffic.length; i++) {
     traffic[i].update(road.borders, []);
   }
-
   for (let i = 0; i < cars.length; i++) {
     cars[i].update(road.borders, traffic);
-  }
-
-  const nonDamagedCars = cars.filter((c) => c.damaged === false);
-
-  if (nonDamagedCars.length === 0) {
-    window.location.reload();
   }
 
   bestCar = cars.find((c) => c.y == Math.min(...cars.map((c) => c.y)));
@@ -108,9 +111,25 @@ function animate(time) {
 
   if (
     oldBestY > bestCar.y &&
-    Math.abs(bestCar.y - secondBestCar.y) >= GAPDIFFERENCE
+    Math.abs(bestCar.y - secondBestCar.y) >= GAP_DIFFERENCE
   ) {
     save();
+  }
+
+  if (
+    orderedTraffic[nextTrafficIndex] &&
+    orderedTraffic[nextTrafficIndex].y > bestCar.y
+  ) {
+    clearTimeout(carPassingTimeout);
+    carPassingTimeout = setTimeout(() => {
+      newGen();
+    }, CAR_PASSING_MAX);
+    nextTrafficIndex++;
+  }
+
+  const nonDamagedCars = cars.filter((c) => c.damaged === false);
+  if (nonDamagedCars.length === 0) {
+    newGen();
   }
 
   carCanvas.height = window.innerHeight;
@@ -125,11 +144,9 @@ function animate(time) {
   }
 
   carCtx.globalAlpha = 0.2;
-
   for (let i = 0; i < cars.length; i++) {
     cars[i].draw(carCtx, "blue");
   }
-
   carCtx.globalAlpha = 1;
   bestCar.draw(carCtx, "blue", true);
 
