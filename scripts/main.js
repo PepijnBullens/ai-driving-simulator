@@ -8,10 +8,17 @@ const networkCtx = networkCanvas.getContext("2d");
 
 const road = new Road(carCanvas.width / 2, carCanvas.width * 0.9);
 
-const N = 200;
+const N = 300;
 const MDIFFERENCE = 0.2;
 const MDELAY = 60;
 const GAPDIFFERENCE = 10;
+
+let genCount = 0;
+const genCountElement = document.querySelector("#genCount");
+if (localStorage.getItem("genCount")) {
+  genCount = localStorage.getItem("genCount");
+}
+genCountElement.textContent = genCount;
 
 let oldBestY = 0;
 if (localStorage.getItem("oldBestY")) {
@@ -54,12 +61,19 @@ setTimeout(() => {
 function save() {
   localStorage.setItem("bestBrain", JSON.stringify(bestCar.brain));
   localStorage.setItem("oldBestY", bestCar.y);
-  window.location.reload();
+  localStorage.setItem("genCount", parseInt(genCount) + 1);
+  if (!window.reloadFlag) {
+    window.reloadFlag = true;
+    setTimeout(() => {
+      window.location.reload();
+    }, 1000);
+  }
 }
 
 function discard() {
   localStorage.removeItem("bestBrain");
   localStorage.removeItem("oldBestY");
+  localStorage.removeItem("genCount");
   window.location.reload();
 }
 
@@ -78,6 +92,12 @@ function animate(time) {
 
   for (let i = 0; i < cars.length; i++) {
     cars[i].update(road.borders, traffic);
+  }
+
+  const nonDamagedCars = cars.filter((c) => c.damaged === false);
+
+  if (nonDamagedCars.length === 0) {
+    window.location.reload();
   }
 
   bestCar = cars.find((c) => c.y == Math.min(...cars.map((c) => c.y)));
