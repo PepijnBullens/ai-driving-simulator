@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Linear Functions | Non Vector</title>
+  </head>
+  <body>
+    <canvas id="myCanvas"></canvas>
+    <select name="pointSelect" id="pointSelect">
+      <option value="A1">A1</option>
+      <option value="A2">A2</option>
+      <option value="B1">B1</option>
+      <option value="B2">B2</option>
+    </select>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+
+      body {
+        padding-top: 25px;
+      }
+
+      select {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 25px;
+      }
+    </style>
+    <script>
+      const canvas = document.querySelector("#myCanvas");
+      const ctx = canvas.getContext("2d");
+
+      let activePoint = "A1";
+
+      const select = document.querySelector("select");
+      select.addEventListener("change", () => {
+        activePoint = select.value;
+      });
+
+      canvas.addEventListener("mousedown", (event) => {
+        const { x, y } = event;
+
+        if (activePoint) {
+          if (activePoint === "A1") {
+            lineA[0].x = x;
+            lineA[0].y = y;
+          }
+          if (activePoint === "A2") {
+            lineA[1].x = x;
+            lineA[1].y = y;
+          }
+          if (activePoint === "B1") {
+            lineB[0].x = x;
+            lineB[0].y = y;
+          }
+          if (activePoint === "B2") {
+            lineB[1].x = x;
+            lineB[1].y = y;
+          }
+        }
+      });
+
+      let lineA = [
+        { x: 400, y: 20 },
+        { x: window.innerWidth - 100, y: window.innerHeight - 20 },
+      ];
+
+      let lineB = [
+        { x: 40, y: window.innerHeight - 40 },
+        { x: window.innerWidth - 40, y: 40 },
+      ];
+
+      update();
+
+      function update() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight - 25;
+
+        drawLine(lineA[0].x, lineA[0].y, lineA[1].x, lineA[1].y, "A", "B");
+        drawLine(lineB[0].x, lineB[0].y, lineB[1].x, lineB[1].y, "A", "B");
+
+        const intersection = findIntersection(
+          lineA[0].x,
+          lineA[0].y,
+          lineA[1].x,
+          lineA[1].y,
+          lineB[0].x,
+          lineB[0].y,
+          lineB[1].x,
+          lineB[1].y
+        );
+
+        if (intersection) {
+          const { x, y } = intersection;
+          drawCircle(x, y, "M");
+        }
+
+        requestAnimationFrame(update);
+      }
+
+      function drawLine(aX, aY, bX, bY, aLabel, bLabel) {
+        ctx.beginPath();
+        ctx.moveTo(aX, aY);
+        ctx.lineTo(bX, bY);
+        ctx.stroke();
+        drawCircle(aX, aY, aLabel);
+        drawCircle(bX, bY, bLabel);
+      }
+
+      function drawCircle(x, y, label) {
+        ctx.beginPath();
+        ctx.fillStyle = "white";
+        ctx.arc(x, y, 10, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+        ctx.font = "12px Arial";
+        ctx.fillStyle = "black";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(label, x, y);
+      }
+
+      function findIntersection(xa1, ya1, xa2, ya2, xb1, yb1, xb2, yb2) {
+        let denominator = (xa1 - xa2) * (yb1 - yb2) - (ya1 - ya2) * (xb1 - xb2);
+
+        if (denominator === 0) {
+          return null;
+        }
+
+        let x =
+          ((xa1 * ya2 - ya1 * xa2) * (xb1 - xb2) -
+            (xa1 - xa2) * (xb1 * yb2 - yb1 * xb2)) /
+          denominator;
+        let y =
+          ((xa1 * ya2 - ya1 * xa2) * (yb1 - yb2) -
+            (ya1 - ya2) * (xb1 * yb2 - yb1 * xb2)) /
+          denominator;
+
+        if (
+          x < Math.min(xa1, xa2) ||
+          x > Math.max(xa1, xa2) ||
+          y < Math.min(ya1, ya2) ||
+          y > Math.max(ya1, ya2) ||
+          x < Math.min(xb1, xb2) ||
+          x > Math.max(xb1, xb2) ||
+          y < Math.min(yb1, yb2) ||
+          y > Math.max(yb1, yb2)
+        ) {
+          return null;
+        }
+
+        return { x, y };
+      }
+    </script>
+  </body>
+</html>
