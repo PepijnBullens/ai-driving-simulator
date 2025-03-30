@@ -1,7 +1,7 @@
 const N = 300;
 const MUTATION_DIFFERENCE = 0.1;
 const CAR_PASSING_MAX = 4000;
-const GAP_DIFFERENCE = 20;
+const GAP_DIFFERENCE = 10;
 
 //
 //
@@ -28,6 +28,10 @@ genCountElement.textContent = genCount;
 let oldBestY = 0;
 if (localStorage.getItem("oldBestY")) {
   oldBestY = localStorage.getItem("oldBestY");
+}
+
+if (localStorage.getItem("bestBrainGen")) {
+  console.log(localStorage.getItem("bestBrainGen"));
 }
 
 const cars = generateCars(N);
@@ -63,16 +67,23 @@ function generateTraffic(height) {
 
 function save() {
   localStorage.setItem("bestBrain", JSON.stringify(bestCar.brain));
+  localStorage.setItem("bestBrainGen", genCount);
   localStorage.setItem("oldBestY", bestCar.y);
 }
 
 function newGen() {
   localStorage.setItem("genCount", parseInt(genCount) + 1);
-  window.location.reload();
+  if (!window.reloadTimeout) {
+    window.reloadTimeout = setTimeout(() => {
+      window.location.reload();
+      window.reloadTimeout = null;
+    }, 1000);
+  }
 }
 
 function discard() {
   localStorage.removeItem("bestBrain");
+  localStorage.removeItem("bestBrainGen");
   localStorage.removeItem("oldBestY");
   localStorage.removeItem("genCount");
   window.location.reload();
@@ -93,9 +104,31 @@ let carPassingTimeout = setTimeout(() => {
   newGen();
 }, CAR_PASSING_MAX);
 
+function calculateFitness(car) {
+  const progressFactor = -car.y; // Higher y means further progress
+  const damagePenalty = car.damaged ? -1000 : 0; // Penalize damaged cars
+  const speedFactor = car.speed || 0; // Reward higher speed
+  return progressFactor + damagePenalty + speedFactor;
+}
+
 animate();
 
 function animate(time) {
+  bestCar = cars.reduce((best, car) => {
+    return calculateFitness(car) > calculateFitness(best) ? car : best;
+  }, cars[0]);
+
+  const secondBestCar =
+    cars.find(
+      (c) =>
+        c.y ==
+        Math.min(
+          ...cars
+            .filter((car) => car !== bestCar)
+            .map((car) => calculateFitness(car))
+        )
+    ) || bestCar;
+
   for (let i = 0; i < traffic.length; i++) {
     traffic[i].update(road.borders, []);
   }
@@ -103,16 +136,8 @@ function animate(time) {
     cars[i].update(road.borders, traffic);
   }
 
-  bestCar = cars.find((c) => c.y == Math.min(...cars.map((c) => c.y)));
-  const secondBestCar = cars.find(
-    (c) =>
-      c.y == Math.min(...cars.filter((car) => car !== bestCar).map((c) => c.y))
-  );
-
-  if (
-    oldBestY > bestCar.y &&
-    Math.abs(bestCar.y - secondBestCar.y) >= GAP_DIFFERENCE
-  ) {
+  if (bestCar.y < oldBestY) {
+    oldBestY = bestCar.y;
     save();
   }
 
@@ -122,6 +147,11 @@ function animate(time) {
   ) {
     clearTimeout(carPassingTimeout);
     carPassingTimeout = setTimeout(() => {
+      cars.forEach((car) => {
+        if (car !== bestCar) {
+          NeuralNetwork.mutate(car.brain, MUTATION_DIFFERENCE * 2);
+        }
+      });
       newGen();
     }, CAR_PASSING_MAX);
     nextTrafficIndex++;
