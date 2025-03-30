@@ -5,6 +5,8 @@ const CAR_PASSING_MAX = 4000;
 const TRAFFIC_HEIGHT = 3000;
 const LANE_COUNT = 3;
 
+const CANVAS_PADDING = 100;
+
 // Canvas Setup
 const carCanvas = document.querySelector("#carCanvas");
 carCanvas.width = 200;
@@ -18,10 +20,22 @@ const road = new Road(carCanvas.width / 2, carCanvas.width * 0.9, LANE_COUNT);
 
 // Generation Tracking
 let genCount = localStorage.getItem("genCount") || 0;
-document.querySelector("#genCount").textContent = genCount;
+document.querySelector(
+  "#genCount"
+).textContent = `Generation Count: ${genCount}`;
 
 let successfullGenCount = localStorage.getItem("successfulGenCount") || 0;
-document.querySelector("#successfulGenCount").textContent = successfullGenCount;
+document.querySelector(
+  "#successfulGenCount"
+).textContent = `Successful Simulations: ${successfullGenCount}`;
+
+document.querySelector("#nOfAI").textContent = `Number Of AI: ${N}`;
+document.querySelector(
+  "#trafficHeight"
+).textContent = `Height Of Traffic: ${TRAFFIC_HEIGHT}`;
+document.querySelector(
+  "#mutationDifference"
+).textContent = `Difference In Mutation: ${MUTATION_DIFFERENCE * 100}%`;
 
 let successfullBlock = false;
 
@@ -164,8 +178,8 @@ function animate(time) {
   if (cars.every((car) => car.damaged)) newGen();
 
   // Canvas Adjustments
-  carCanvas.height = window.innerHeight;
-  networkCanvas.height = window.innerHeight;
+  carCanvas.height = window.innerHeight - CANVAS_PADDING;
+  networkCanvas.height = window.innerHeight - CANVAS_PADDING;
   carCtx.save();
   carCtx.translate(0, -bestCar.y + carCanvas.height * 0.7);
 

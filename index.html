@@ -7,14 +7,24 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <canvas id="carCanvas"></canvas>
-    <div id="verticalButtons">
-      <button onclick="discard()">🗑️</button>
-      <button onclick="discardSuccessfullGens()">🗑️ 2</button>
-      <h1 id="genCount"></h1>
-      <h1 id="successfulGenCount"></h1>
+    <div class="info">
+      <button onclick="discard()">Reset Generation</button>
+      <button onclick="discardSuccessfullGens()">
+        Reset All Successful Generation
+      </button>
+      <div class="divider"></div>
+      <h2 id="genCount"></h2>
+      <h2 id="successfulGenCount"></h2>
+      <div class="divider"></div>
+      <h2 id="nOfAI"></h2>
+      <h2 id="trafficHeight"></h2>
+      <h2 id="mutationDifference"></h2>
     </div>
-    <canvas id="networkCanvas"></canvas>
+
+    <div class="canvasContainer">
+      <canvas id="carCanvas"></canvas>
+      <canvas id="networkCanvas"></canvas>
+    </div>
 
     <script src="./scripts/network.js"></script>
     <script src="./scripts/visualizer.js"></script>
