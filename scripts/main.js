@@ -1,39 +1,31 @@
-const N = 300;
-const MUTATION_DIFFERENCE = 0.1;
+// Constants
+const N = 400;
+const MUTATION_DIFFERENCE = 0.3;
 const CAR_PASSING_MAX = 4000;
-const GAP_DIFFERENCE = 10;
+const TRAFFIC_HEIGHT = 3000;
+const LANE_COUNT = 3;
 
-//
-//
-//
-//
-
+// Canvas Setup
 const carCanvas = document.querySelector("#carCanvas");
 carCanvas.width = 200;
 const networkCanvas = document.querySelector("#networkCanvas");
 networkCanvas.width = 300;
-
 const carCtx = carCanvas.getContext("2d");
 const networkCtx = networkCanvas.getContext("2d");
 
-const road = new Road(carCanvas.width / 2, carCanvas.width * 0.9);
+// Road Setup
+const road = new Road(carCanvas.width / 2, carCanvas.width * 0.9, LANE_COUNT);
 
-let genCount = 0;
-const genCountElement = document.querySelector("#genCount");
-if (localStorage.getItem("genCount")) {
-  genCount = localStorage.getItem("genCount");
-}
-genCountElement.textContent = genCount;
+// Generation Tracking
+let genCount = localStorage.getItem("genCount") || 0;
+document.querySelector("#genCount").textContent = genCount;
 
-let oldBestY = 0;
-if (localStorage.getItem("oldBestY")) {
-  oldBestY = localStorage.getItem("oldBestY");
-}
+let successfullGenCount = localStorage.getItem("successfulGenCount") || 0;
+document.querySelector("#successfulGenCount").textContent = successfullGenCount;
 
-if (localStorage.getItem("bestBrainGen")) {
-  console.log(localStorage.getItem("bestBrainGen"));
-}
+let successfullBlock = false;
 
+// Car Setup
 const cars = generateCars(N);
 let bestCar = cars[0];
 if (localStorage.getItem("bestBrain")) {
@@ -45,64 +37,39 @@ if (localStorage.getItem("bestBrain")) {
   }
 }
 
-const TRAFFIC_HEIGHT = 5000;
+let hasManeuvered = localStorage.getItem("hasManeuvered") || false;
 
+// Traffic Setup
 const traffic = generateTraffic(TRAFFIC_HEIGHT);
+let nextTrafficIndex = 0;
+const orderedTraffic = [...traffic].sort((a, b) => b.y - a.y);
+let carPassingTimeout = setTimeout(newGen, CAR_PASSING_MAX);
+
+// Function Definitions
+function generateCars(N) {
+  return Array.from(
+    { length: N },
+    () => new Car(road.getLaneCenter(1), 100, 30, 50, "AI")
+  );
+}
 
 function generateTraffic(height) {
   const traffic = [];
-  const lanes = [0, 1, 2];
   let currentY = 0;
-
   while (currentY > -height) {
-    const lane = lanes[Math.floor(Math.random() * lanes.length)];
+    const lane = [0, 1, 2][Math.floor(Math.random() * 3)];
     traffic.push(
       new Car(road.getLaneCenter(lane), currentY, 30, 50, "DUMMY", 2)
     );
     currentY -= Math.random() * 200 + 100; // Random spacing between 100 and 300
   }
-
   return traffic;
 }
 
-function save() {
-  localStorage.setItem("bestBrain", JSON.stringify(bestCar.brain));
-  localStorage.setItem("bestBrainGen", genCount);
-  localStorage.setItem("oldBestY", bestCar.y);
+function getLane(x) {
+  const laneWidth = road.width / LANE_COUNT;
+  return Math.floor((x - road.left) / laneWidth);
 }
-
-function newGen() {
-  localStorage.setItem("genCount", parseInt(genCount) + 1);
-  if (!window.reloadTimeout) {
-    window.reloadTimeout = setTimeout(() => {
-      window.location.reload();
-      window.reloadTimeout = null;
-    }, 1000);
-  }
-}
-
-function discard() {
-  localStorage.removeItem("bestBrain");
-  localStorage.removeItem("bestBrainGen");
-  localStorage.removeItem("oldBestY");
-  localStorage.removeItem("genCount");
-  window.location.reload();
-}
-
-function generateCars(N) {
-  const cars = [];
-  for (let i = 0; i < N; i++) {
-    cars.push(new Car(road.getLaneCenter(1), 100, 30, 50, "AI"));
-  }
-  return cars;
-}
-
-let nextTrafficIndex = 0;
-const orderedTraffic = [...traffic].sort((a, b) => a.y - b.y).reverse();
-
-let carPassingTimeout = setTimeout(() => {
-  newGen();
-}, CAR_PASSING_MAX);
 
 function calculateFitness(car) {
   const progressFactor = -car.y; // Higher y means further progress
@@ -111,79 +78,109 @@ function calculateFitness(car) {
   return progressFactor + damagePenalty + speedFactor;
 }
 
-animate();
+function successfulGeneration() {
+  successfullBlock = true;
+  localStorage.setItem("successfulGenCount", parseInt(successfullGenCount) + 1);
+  discard();
+}
 
-function animate(time) {
-  bestCar = cars.reduce((best, car) => {
-    return calculateFitness(car) > calculateFitness(best) ? car : best;
-  }, cars[0]);
+function save(brain) {
+  console.log("SAVING");
+  localStorage.setItem("bestBrain", JSON.stringify(brain));
+}
 
-  const secondBestCar =
-    cars.find(
-      (c) =>
-        c.y ==
-        Math.min(
-          ...cars
-            .filter((car) => car !== bestCar)
-            .map((car) => calculateFitness(car))
-        )
-    ) || bestCar;
-
-  for (let i = 0; i < traffic.length; i++) {
-    traffic[i].update(road.borders, []);
-  }
-  for (let i = 0; i < cars.length; i++) {
-    cars[i].update(road.borders, traffic);
-  }
-
-  if (bestCar.y < oldBestY) {
-    oldBestY = bestCar.y;
-    save();
-  }
-
-  if (
-    orderedTraffic[nextTrafficIndex] &&
-    orderedTraffic[nextTrafficIndex].y > bestCar.y
-  ) {
+function newGen() {
+  if (!window.reloadTimeout) {
     clearTimeout(carPassingTimeout);
-    carPassingTimeout = setTimeout(() => {
-      cars.forEach((car) => {
-        if (car !== bestCar) {
-          NeuralNetwork.mutate(car.brain, MUTATION_DIFFERENCE * 2);
-        }
-      });
-      newGen();
-    }, CAR_PASSING_MAX);
-    nextTrafficIndex++;
+    window.reloadTimeout = setTimeout(() => {
+      localStorage.setItem("genCount", parseInt(genCount) + 1);
+      window.location.reload();
+      window.reloadTimeout = null;
+    }, 1000);
+  }
+}
+
+function discard() {
+  ["bestBrain", "genCount", "hasManeuvered"].forEach((key) =>
+    localStorage.removeItem(key)
+  );
+  window.location.reload();
+}
+
+function discardSuccessfullGens() {
+  localStorage.removeItem("successfulGenCount");
+  discard();
+}
+
+// Animation Loop
+function animate(time) {
+  const lastTrafficDummyY = Math.min(...traffic.map((dummy) => dummy.y));
+  if (!successfullBlock && bestCar.y < lastTrafficDummyY)
+    successfulGeneration();
+
+  bestCar = cars.reduce(
+    (best, car) =>
+      calculateFitness(car) > calculateFitness(best) ? car : best,
+    cars[0]
+  );
+
+  traffic.forEach((car) => car.update(road.borders, []));
+  cars.forEach((car) => car.update(road.borders, traffic));
+
+  if (orderedTraffic[nextTrafficIndex]) {
+    const trafficCar = orderedTraffic[nextTrafficIndex];
+
+    const bestCarLane = getLane(bestCar.x);
+    const trafficLane = getLane(trafficCar.x);
+
+    if (
+      trafficCar.y < bestCar.y && // Traffic was ahead
+      trafficLane === bestCarLane // Best car started in the same lane
+    ) {
+      bestCar.hadToManeuver = true; // Mark that a maneuver was required
+      localStorage.setItem("hasManeuvered", true);
+      hasManeuvered = true;
+    }
+
+    if (trafficCar.y > bestCar.y) {
+      clearTimeout(carPassingTimeout);
+      carPassingTimeout = setTimeout(newGen, CAR_PASSING_MAX);
+      nextTrafficIndex++;
+
+      if (bestCar.hadToManeuver) {
+        localStorage.setItem("hasManeuvered", true);
+        hasManeuvered = true;
+
+        save(bestCar.brain); // Only save if maneuvering was required
+        bestCar.hadToManeuver = false; // Reset for next check
+      }
+    }
   }
 
-  const nonDamagedCars = cars.filter((c) => c.damaged === false);
-  if (nonDamagedCars.length === 0) {
-    newGen();
+  if (!hasManeuvered) {
+    save(bestCar.brain);
   }
 
+  if (cars.every((car) => car.damaged)) newGen();
+
+  // Canvas Adjustments
   carCanvas.height = window.innerHeight;
   networkCanvas.height = window.innerHeight;
-
   carCtx.save();
   carCtx.translate(0, -bestCar.y + carCanvas.height * 0.7);
 
   road.draw(carCtx);
-  for (let i = 0; i < traffic.length; i++) {
-    traffic[i].draw(carCtx, "red");
-  }
+  traffic.forEach((car) => car.draw(carCtx, "red"));
 
   carCtx.globalAlpha = 0.2;
-  for (let i = 0; i < cars.length; i++) {
-    cars[i].draw(carCtx, "blue");
-  }
+  cars.forEach((car) => car.draw(carCtx, "blue"));
   carCtx.globalAlpha = 1;
   bestCar.draw(carCtx, "blue", true);
-
   carCtx.restore();
 
   networkCtx.lineDashOffset = -time / 50;
   Visualizer.drawNetwork(networkCtx, bestCar.brain);
-
   requestAnimationFrame(animate);
 }
+
+animate();
